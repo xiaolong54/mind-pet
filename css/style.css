@@ -15,10 +15,245 @@ body {
     height: 100vh;
 }
 
+/* ========== 欢迎/设置页面 ========== */
+.welcome-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: linear-gradient(135deg, #FFF5F7 0%, #F0F8FF 50%, #E8F5E9 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    opacity: 1;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.welcome-screen.hidden {
+    opacity: 0;
+    transform: scale(1.05);
+    pointer-events: none;
+}
+
+.welcome-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border-radius: 32px;
+    padding: 48px;
+    width: 480px;
+    max-width: 90vw;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.welcome-header {
+    margin-bottom: 32px;
+}
+
+.welcome-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.welcome-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.welcome-subtitle {
+    font-size: 14px;
+    color: #888;
+}
+
+.setup-section {
+    margin-bottom: 28px;
+    text-align: left;
+}
+
+.setup-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* 宠物类型选择 */
+.pet-type-grid-welcome {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.pet-type-item-welcome {
+    padding: 16px 8px;
+    background: #f8f8f8;
+    border: 2px solid transparent;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+}
+
+.pet-type-item-welcome:hover {
+    background: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+}
+
+.pet-type-item-welcome.selected {
+    border-color: var(--primary, #FFB6C1);
+    background: var(--primary-light, #FFE4E8);
+}
+
+.pet-type-item-welcome svg {
+    width: 50px;
+    height: 60px;
+    margin-bottom: 4px;
+}
+
+.pet-type-item-welcome span {
+    font-size: 12px;
+    color: #666;
+}
+
+/* 颜色选择 */
+.color-grid-welcome {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+}
+
+.color-option-welcome {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.color-option-welcome:hover {
+    transform: scale(1.15);
+}
+
+.color-option-welcome.selected {
+    border-color: #333;
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* 名字输入 */
+.name-input-welcome {
+    width: 100%;
+    padding: 14px 18px;
+    font-size: 16px;
+    border: 2px solid #eee;
+    border-radius: 14px;
+    outline: none;
+    transition: all 0.2s;
+    text-align: center;
+    font-family: 'Noto Sans SC', sans-serif;
+}
+
+.name-input-welcome:focus {
+    border-color: var(--primary, #FFB6C1);
+    box-shadow: 0 0 0 4px rgba(255, 107, 157, 0.15);
+}
+
+/* 预览区 */
+.preview-section {
+    padding: 24px;
+    background: linear-gradient(135deg, #fafafa, #f0f0f0);
+    border-radius: 20px;
+    margin-bottom: 28px;
+}
+
+.preview-pet {
+    width: 120px;
+    height: 144px;
+    margin: 0 auto 12px;
+}
+
+.preview-pet svg {
+    width: 100%;
+    height: 100%;
+}
+
+.preview-name {
+    font-size: 20px;
+    font-weight: 600;
+    color: #333;
+}
+
+.preview-greeting {
+    font-size: 13px;
+    color: #888;
+    margin-top: 4px;
+}
+
+/* 开始按钮 */
+.start-btn {
+    width: 100%;
+    padding: 16px 32px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(135deg, var(--primary-dark, #FF8FAB), var(--primary, #FFB6C1));
+    border: none;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 8px 25px rgba(255, 107, 157, 0.4);
+}
+
+.start-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(255, 107, 157, 0.5);
+}
+
+.start-btn:active {
+    transform: translateY(0);
+}
+
+.start-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+/* 跳过按钮 */
+.skip-link {
+    display: inline-block;
+    margin-top: 16px;
+    font-size: 13px;
+    color: #999;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.skip-link:hover {
+    color: #666;
+}
+
 /* ========== 左侧面板 ========== */
 .left-panel {
-    width: 320px;
-    min-width: 320px;
+    width: 400px;
+    min-width: 400px;
     height: 100vh;
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(20px);
@@ -104,6 +339,7 @@ body {
 .mood-fill { background: linear-gradient(90deg, #FF6B9D, #FFB6C1); }
 .stress-fill { background: linear-gradient(90deg, #FF9800, #FFC107); }
 .energy-fill { background: linear-gradient(90deg, #4CAF50, #98D8C8); }
+.lucky-fill { background: linear-gradient(90deg, #9C27B0, #E1BEE7); }
 
 /* ========== 建议卡片 ========== */
 .advice-list { display: flex; flex-direction: column; gap: 10px; }
@@ -1170,8 +1406,8 @@ body {
 /* ========== 响应式 ========== */
 @media (max-width: 1024px) {
     .left-panel {
-        width: 280px;
-        min-width: 280px;
+        width: 350px;
+        min-width: 350px;
     }
     
     .records-stats {

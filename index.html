@@ -72,6 +72,16 @@
                         <div class="stat-fill energy-fill" id="energy-fill" style="width: 70%"></div>
                     </div>
                 </div>
+                <div class="stat-item" data-stat="lucky">
+                    <div class="stat-header">
+                        <span class="stat-icon">🍀</span>
+                        <span class="stat-name">幸运值</span>
+                        <span class="stat-value" id="lucky-value">65</span>
+                    </div>
+                    <div class="stat-bar">
+                        <div class="stat-fill lucky-fill" id="lucky-fill" style="width: 65%"></div>
+                    </div>
+                </div>
             </div>
             
             <!-- 健康建议区 -->
@@ -79,6 +89,7 @@
                 <h3><span>💡</span> 暖心建议</h3>
                 <div class="advice-list" id="advice-list">
                     <p class="advice-item">🌟 你今天状态很棒！</p>
+                    <p class="advice-item">🌸 记得给自己一个微笑~</p>
                 </div>
             </div>
             
@@ -252,6 +263,45 @@
                 </div>
                 <button class="save-appearance-btn" id="save-appearance">保存</button>
             </div>
+        </div>
+    </div>
+
+    <!-- 欢迎/设置页面 -->
+    <div class="welcome-screen" id="welcome-screen">
+        <div class="welcome-card">
+            <div class="welcome-header">
+                <div class="welcome-icon">🌸</div>
+                <h1 class="welcome-title">欢迎来到心灵伙伴</h1>
+                <p class="welcome-subtitle">创建属于你的专属宠物伙伴</p>
+            </div>
+
+            <!-- 宠物类型选择 -->
+            <div class="setup-section">
+                <div class="setup-label">🐾 选择你的宠物</div>
+                <div class="pet-type-grid-welcome" id="setup-pet-types"></div>
+            </div>
+
+            <!-- 颜色选择 -->
+            <div class="setup-section">
+                <div class="setup-label">🎨 选择喜欢的颜色</div>
+                <div class="color-grid-welcome" id="setup-colors"></div>
+            </div>
+
+            <!-- 名字输入 -->
+            <div class="setup-section">
+                <div class="setup-label">✏️ 给它取个名字</div>
+                <input type="text" class="name-input-welcome" id="setup-name-input" placeholder="例如：小暖、团子、棉花糖..." maxlength="8">
+            </div>
+
+            <!-- 预览 -->
+            <div class="preview-section">
+                <div class="preview-pet" id="setup-preview"></div>
+                <div class="preview-name" id="setup-preview-name">我的小伙伴</div>
+                <div class="preview-greeting" id="setup-preview-greeting">准备开始治愈之旅~</div>
+            </div>
+
+            <button class="start-btn" id="start-btn">✨ 开始旅程 ✨</button>
+            <span class="skip-link" id="skip-setup">使用默认设置</span>
         </div>
     </div>
 

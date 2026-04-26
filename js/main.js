@@ -218,9 +218,9 @@ const Expressions = {
 // ========== 全局状态 ==========
 const State = {
     pet: { type: 'bunny', color: '#FFB6C1', name: '小伙伴' },
-    stats: { mood: 75, stress: 45, energy: 70 },
+    stats: { mood: 75, stress: 45, energy: 70, lucky: 65 },
     history: [],
-    isFirstVisit: true,
+    isSetupComplete: false, // 标记设置是否完成
     joyValue: 50,
     clickCount: 0,
     currentExpression: 'calm',
@@ -276,9 +276,176 @@ function recycleParticle(p) {
     if (particlePool.length < 50) particlePool.push(p);
 }
 
+// ========== 欢迎/设置页面 ==========
+let SetupState = {
+    selectedType: 'bunny',
+    selectedColor: '#FFB6C1',
+    petName: '小伙伴'
+};
+
+function initWelcomeScreen() {
+    const welcomeScreen = document.getElementById('welcome-screen');
+    if (!welcomeScreen) return;
+
+    // 如果设置已完成，隐藏欢迎页面
+    if (State.isSetupComplete) {
+        welcomeScreen.classList.add('hidden');
+        welcomeScreen.style.display = 'none';
+        return;
+    }
+
+    // 确保欢迎页面显示
+    welcomeScreen.style.display = 'flex';
+    welcomeScreen.classList.remove('hidden');
+
+    // 初始化宠物类型选择
+    const typesContainer = document.getElementById('setup-pet-types');
+    if (typesContainer) {
+        let typesHTML = '';
+        Object.keys(PetTypes).forEach(type => {
+            const isSelected = type === SetupState.selectedType;
+            typesHTML += `<div class="pet-type-item-welcome ${isSelected ? 'selected' : ''}" data-type="${type}">
+                <svg viewBox="0 0 100 120">${generatePetSVG(type, Colors[SetupState.selectedColor] || Colors['#FFB6C1'], 'calm')}</svg>
+                <span>${PetTypes[type].name}</span>
+            </div>`;
+        });
+        typesContainer.innerHTML = typesHTML;
+
+        // 绑定点击事件
+        typesContainer.querySelectorAll('.pet-type-item-welcome').forEach(item => {
+            item.addEventListener('click', () => {
+                typesContainer.querySelectorAll('.pet-type-item-welcome').forEach(i => i.classList.remove('selected'));
+                item.classList.add('selected');
+                SetupState.selectedType = item.dataset.type;
+                updateSetupPreview();
+            });
+        });
+    }
+
+    // 初始化颜色选择
+    const colorsContainer = document.getElementById('setup-colors');
+    if (colorsContainer) {
+        let colorsHTML = '';
+        Object.keys(Colors).forEach(c => {
+            const isSelected = c === SetupState.selectedColor;
+            colorsHTML += `<div class="color-option-welcome ${isSelected ? 'selected' : ''}" data-color="${c}" style="background: ${c}"></div>`;
+        });
+        colorsContainer.innerHTML = colorsHTML;
+
+        // 绑定点击事件
+        colorsContainer.querySelectorAll('.color-option-welcome').forEach(opt => {
+            opt.addEventListener('click', () => {
+                colorsContainer.querySelectorAll('.color-option-welcome').forEach(o => o.classList.remove('selected'));
+                opt.classList.add('selected');
+                SetupState.selectedColor = opt.dataset.color;
+                updateSetupPreview();
+                // 同时更新宠物类型预览的颜色
+                updateSetupPetColors();
+            });
+        });
+    }
+
+    // 初始化名字输入
+    const nameInput = document.getElementById('setup-name-input');
+    if (nameInput) {
+        nameInput.value = SetupState.petName;
+        nameInput.addEventListener('input', (e) => {
+            SetupState.petName = e.target.value || '小伙伴';
+            updateSetupPreview();
+        });
+    }
+
+    // 更新初始预览
+    updateSetupPreview();
+
+    // 开始按钮
+    const startBtn = document.getElementById('start-btn');
+    if (startBtn) {
+        startBtn.addEventListener('click', () => {
+            completeSetup();
+        });
+    }
+
+    // 跳过按钮
+    const skipBtn = document.getElementById('skip-setup');
+    if (skipBtn) {
+        skipBtn.addEventListener('click', () => {
+            completeSetup(true);
+        });
+    }
+}
+
+function updateSetupPetColors() {
+    const typesContainer = document.getElementById('setup-pet-types');
+    if (typesContainer) {
+        typesContainer.querySelectorAll('.pet-type-item-welcome').forEach(item => {
+            const type = item.dataset.type;
+            const svg = item.querySelector('svg');
+            if (svg) {
+                svg.innerHTML = generatePetSVG(type, Colors[SetupState.selectedColor] || Colors['#FFB6C1'], 'calm');
+            }
+        });
+    }
+}
+
+function updateSetupPreview() {
+    const previewContainer = document.getElementById('setup-preview');
+    const previewName = document.getElementById('setup-preview-name');
+    const previewGreeting = document.getElementById('setup-preview-greeting');
+
+    if (previewContainer) {
+        previewContainer.innerHTML = `<svg viewBox="0 0 100 120">${generatePetSVG(SetupState.selectedType, Colors[SetupState.selectedColor] || Colors['#FFB6C1'], 'happy')}</svg>`;
+    }
+
+    const displayName = SetupState.petName || '我的小伙伴';
+    if (previewName) {
+        previewName.textContent = displayName;
+    }
+
+    if (previewGreeting) {
+        const greetings = ['准备开始治愈之旅~', '期待与你相遇~', '一起探索心灵世界~', '开启美好的一天~'];
+        previewGreeting.textContent = greetings[Math.floor(Math.random() * greetings.length)];
+    }
+}
+
+function completeSetup(useDefaults = false) {
+    if (!useDefaults) {
+        // 保存用户选择
+        State.pet.type = SetupState.selectedType;
+        State.pet.color = SetupState.selectedColor;
+        State.pet.name = SetupState.petName || '小伙伴';
+    }
+
+    // 标记设置完成
+    State.isSetupComplete = true;
+    saveState();
+
+    // 隐藏欢迎页面
+    const welcomeScreen = document.getElementById('welcome-screen');
+    if (welcomeScreen) {
+        welcomeScreen.classList.add('hidden');
+        setTimeout(() => {
+            welcomeScreen.style.display = 'none';
+        }, 500);
+    }
+
+    // 初始化宠物和UI
+    updateSidebar();
+    updateFloatingPetAppearance();
+    updateAdvice();
+    startPetAI();
+
+    // 显示欢迎提示
+    setTimeout(() => {
+        showBubble(`你好呀！我是${State.pet.name}~ 💕`, 3000);
+    }, 800);
+}
+
 // ========== 初始化 ==========
 document.addEventListener('DOMContentLoaded', () => {
     loadState();
+    // 初始化欢迎/设置页面
+    initWelcomeScreen();
     // 使用改进的重庆城市地图 [基于 CubeCity 源代码改进]
     if (window.initChongqingCity) {
         window.initChongqingCity();
@@ -289,9 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     initUI();
     initFloatingPet();
-    if (!State.isFirstVisit) {
-        startPetAI();
-    }
+    // 注意：宠物AI移动和自动移动在completeSetup中启动，不再在此启动
 });
 
 // ========== Three.js 城市初始化 ==========
@@ -726,7 +891,7 @@ function pauseAllAnimations() {
 }
 
 function resumeAllAnimations() {
-    if (!State.isFirstVisit) {
+    if (State.isSetupComplete) {
         startParticleAnimation();
         startPetAI();
         startBlinking();
@@ -740,7 +905,19 @@ function loadState() {
         try {
             const parsed = JSON.parse(saved);
             Object.assign(State, parsed);
-        } catch (e) { console.warn('Failed to load state'); }
+            // 确保新添加的字段存在（兼容旧版本）
+            if (State.stats.lucky === undefined) {
+                State.stats.lucky = 65;
+            }
+            // 兼容旧版本的 isFirstVisit 字段
+            if (State.isFirstVisit !== undefined && State.isSetupComplete === undefined) {
+                State.isSetupComplete = !State.isFirstVisit;
+            }
+        } catch (e) {
+            console.warn('Failed to load state');
+            // 解析失败，视为首次设置
+            State.isSetupComplete = false;
+        }
     }
 }
 
@@ -749,7 +926,7 @@ function saveState() {
         pet: State.pet,
         stats: State.stats,
         history: State.history.slice(-20),
-        isFirstVisit: false,
+        isSetupComplete: State.isSetupComplete,
         joyValue: State.joyValue,
         position: State.position,
         records: State.records.slice(-100)
@@ -958,17 +1135,10 @@ function initRecordsUI() {
 
 // ========== UI 初始化 ==========
 function initUI() {
-    if (State.isFirstVisit) {
-        showCreateFlow();
-    } else {
-        updateSidebar();
-        initMainInteractions();
+    // 如果设置未完成，不初始化主交互
+    if (!State.isSetupComplete) {
+        return;
     }
-}
-
-function showCreateFlow() {
-    State.isFirstVisit = false;
-    saveState();
     updateSidebar();
     initMainInteractions();
 }
@@ -1020,6 +1190,8 @@ function updateSidebar() {
     const stressFill = document.getElementById('stress-fill');
     const energyVal = document.getElementById('energy-value');
     const energyFill = document.getElementById('energy-fill');
+    const luckyVal = document.getElementById('lucky-value');
+    const luckyFill = document.getElementById('lucky-fill');
 
     if (moodVal) moodVal.textContent = State.stats.mood;
     if (moodFill) moodFill.style.width = State.stats.mood + '%';
@@ -1027,6 +1199,8 @@ function updateSidebar() {
     if (stressFill) stressFill.style.width = State.stats.stress + '%';
     if (energyVal) energyVal.textContent = State.stats.energy;
     if (energyFill) energyFill.style.width = State.stats.energy + '%';
+    if (luckyVal) luckyVal.textContent = State.stats.lucky;
+    if (luckyFill) luckyFill.style.width = State.stats.lucky + '%';
 
     document.documentElement.style.setProperty('--primary', State.pet.color);
 }
@@ -1036,24 +1210,173 @@ function generateSmallAvatar() {
 }
 
 // ========== 智能建议系统 ==========
+const ActionAdvice = {
+    // 社交活动
+    social: [
+        '🍽️ 约上好朋友出去吃个饭聊聊天吧，分享美食的同时也能分享心情~',
+        '🚶 出去走走，去公园或者江边散散步，换换心情',
+        '☕ 找个安静的咖啡馆，点一杯喜欢的饮品，发呆也好，放空也好',
+        '🎬 和朋友一起看场电影，享受片刻的欢乐时光',
+        '🛍️ 约上闺蜜/兄弟一起去逛街，看看有什么新鲜玩意儿',
+        '🏃 约朋友一起运动，跑步、打球、瑜伽都可以',
+        '🎮 约朋友一起玩游戏，开黑聊天，欢乐加倍'
+    ],
+    // 自我放松
+    relaxation: [
+        '🛀 泡个热水澡，敷个面膜，好好宠爱自己',
+        '📖 读一本想读很久的书，沉浸在文字的世界里',
+        '🎵 听一些喜欢的音乐，让旋律抚慰心灵',
+        '🎨 涂色书或者画一幅画，用色彩表达情绪',
+        '🧘 做几分钟冥想或深呼吸，给大脑放个假',
+        '🌿 在家里摆弄一下绿植，或者去花市逛逛',
+        '🧸 抱抱毛绒玩具，童心可以治愈一切'
+    ],
+    // 生活小确幸
+    smallHappiness: [
+        '🍰 给自己买一块小蛋糕，甜食可以带来幸福感',
+        '🌸 买一束鲜花放在桌上，让房间充满生机',
+        '☀️ 拉开窗帘让阳光洒进来，晒晒太阳补补钙',
+        '🍵 泡一杯热茶/咖啡，感受温暖的香气',
+        '📸 给今天拍张照片，记录生活中的美好瞬间',
+        '✍️ 写日记，把心情写下来，也是一种释放',
+        '🌙 早点睡觉，充足的睡眠是最好的治愈'
+    ],
+    // 自我成长
+    growth: [
+        '📝 写下今天的三件好事，关注生活中的积极面',
+        '🎯 设定一个小目标，完成后会有满满的成就感',
+        '📚 学习一项新技能，充实自己也转移注意力',
+        '💪 给自己一点鼓励的话语，积极暗示很重要',
+        '🗺️ 规划一次小旅行，给生活一些期待',
+        '🤝 帮助别人，做一件小小的好事，感受善意'
+    ]
+};
+
 const AdviceLibrary = {
     mood: {
-        high: ['💖 心情很棒！保持这份能量~', '🌟 阳光正好，你的心情也在发光！', '✨ 好心情是最好的礼物~'],
-        medium: ['🌻 心情还不错，继续保持~', '☀️ 不错的状态，可以尝试新事物！'],
-        low: ['💭 有点低落，可以找信任的人聊聊~', '🍃 允许自己休息一下，深呼吸~', '🌙 低落是暂时的，会好起来的~'],
-        critical: ['💝 你不是一个人，我一直陪着你~', '🌈 黑暗之后总有黎明，再坚持一下~', '🤗 难受的时候，宠物永远在这里~']
+        high: [
+            '💖 心情很棒！保持这份能量~',
+            '🌟 阳光正好，你的心情也在发光！',
+            '✨ 好心情是最好的礼物~',
+            '🌈 这么好的心情，可以出去走走散散步~',
+            '🦋 趁着好心情，约朋友一起出去玩吧！',
+            '🎉 心情美美哒，可以尝试一些新事物~'
+        ],
+        medium: [
+            '🌻 心情还不错，继续保持~',
+            '☀️ 不错的状态，可以尝试新事物！',
+            '🍃 状态平稳，可以听听音乐放松一下',
+            '🌷 给自己一个小奖励吧，比如一块小蛋糕',
+            '🎨 画一幅画或涂涂颜色，释放创作灵感'
+        ],
+        low: [
+            '💭 有点低落，可以找信任的人聊聊~',
+            '🍃 允许自己休息一下，深呼吸~',
+            '🌙 低落是暂时的，会好起来的~',
+            '☕ 泡杯热茶暖暖身子，出去走走换换心情',
+            '🎵 听一些治愈系的音乐，让旋律陪伴你',
+            '💐 买一束喜欢的花，给房间添点生机'
+        ],
+        critical: [
+            '💝 你不是一个人，我一直陪着你~',
+            '🌈 黑暗之后总有黎明，再坚持一下~',
+            '🤗 难受的时候，宠物永远在这里~',
+            '🫂 允许自己难过，但别忘了你值得被爱',
+            '🌸 明天会更好的，今晚早点休息吧',
+            '💕 无论发生什么，我都在这里陪着你'
+        ]
     },
     stress: {
-        high: ['😰 压力有点大...试试深呼吸~', '🧘 闭上眼睛，想象自己在海边~', '🌊 压力像海浪，会来的也会走的~'],
-        medium: ['💆 适当放松一下吧~', '☕ 泡杯热茶，休息一会儿~'],
-        low: ['✨ 压力不大，生活很轻松~', '🌈 继续保持这份从容~'],
-        critical: ['🛋️ 今天就什么都不做，好好休息吧~', '🌙 明天会是新的一天~']
+        high: [
+            '😰 压力有点大...试试深呼吸~',
+            '🧘 闭上眼睛，想象自己在海边~',
+            '🌊 压力像海浪，会来的也会走的~',
+            '🚶 出去走走，到户外呼吸一下新鲜空气',
+            '📱 给好久没联系的朋友打个电话聊聊天',
+            '🎯 把烦恼写下来，然后一件件解决'
+        ],
+        medium: [
+            '💆 适当放松一下吧~',
+            '☕ 泡杯热茶，休息一会儿~',
+            '🛋️ 躺在沙发上休息，听听舒缓的音乐',
+            '🌿 出去晒晒太阳，感受大自然的温暖',
+            '📺 看一集喜欢的综艺节目，笑一笑'
+        ],
+        low: [
+            '✨ 压力不大，生活很轻松~',
+            '🌈 继续保持这份从容~',
+            '🌸 享受这份轻松自在的感觉~',
+            '🎨 有精力的话，可以尝试一些有趣的事'
+        ],
+        critical: [
+            '🛋️ 今天就什么都不做，好好休息吧~',
+            '🌙 明天会是新的一天~',
+            '💤 关掉手机，好好睡一觉恢复精力',
+            '🧸 抱着喜欢的毛绒玩具休息一下吧',
+            '📵 暂时远离让你烦心的事情，给自己放个假'
+        ]
     },
     energy: {
-        high: ['⚡ 能量满满！去完成你的目标吧~', '🚀 今天效率一定很高！', '💫 充满电的感觉真好~'],
-        medium: ['📋 制定个小目标吧~', '🎯 专注一件事，完成它~'],
-        low: ['😪 有点疲惫了...休息一下吧~', '🛏️ 小憩一下会恢复精力~', '🎵 听点轻音乐放松一下~'],
-        critical: ['🔋 能量严重不足，请立刻休息！', '😴 不要硬撑，身体需要休息~']
+        high: [
+            '⚡ 能量满满！去完成你的目标吧~',
+            '🚀 今天效率一定很高！',
+            '💫 充满电的感觉真好~',
+            '🏃 趁着精力充沛，去运动一下吧！',
+            '📚 学习新知识，充实自己！',
+            '🎯 设定目标并努力完成它！'
+        ],
+        medium: [
+            '📋 制定个小目标吧~',
+            '🎯 专注一件事，完成它~',
+            '📝 列一个待办清单，一件件完成',
+            '🌱 做些力所能及的小事就好'
+        ],
+        low: [
+            '😪 有点疲惫了...休息一下吧~',
+            '🛏️ 小憩一下会恢复精力~',
+            '🎵 听点轻音乐放松一下~',
+            '🍵 喝杯热饮，休息一下再继续',
+            '🌸 给自己买点小东西犒劳一下',
+            '📞 和朋友聊聊天，分享一下心情'
+        ],
+        critical: [
+            '🔋 能量严重不足，请立刻休息！',
+            '😴 不要硬撑，身体需要休息~',
+            '🛋️ 今天就好好休息吧，明天再战！',
+            '💤 关掉闹钟，睡到自然醒',
+            '🫂 累了就休息，你已经很努力了'
+        ]
+    },
+    lucky: {
+        high: [
+            '🍀 今天的幸运值爆棚！快去买张彩票试试~',
+            '🌟 好事即将发生！保持开放的心态迎接~',
+            '✨ 今天的你会遇到意想不到的好运！',
+            '🎁 幸运女神眷顾你，注意发现身边的美好~',
+            '🌈 今天适合尝试新事物，可能会有惊喜哦！',
+            '💫 好事连连，记得记录下今天的幸运时刻！'
+        ],
+        medium: [
+            '🍀 今天的运气还不错~',
+            '🌸 小确幸在等着你，保持期待~',
+            '✨ 留意身边的小幸运，可能是一杯免费的咖啡~',
+            '🌷 也许今天会遇到有趣的人或事~',
+            '🎈 普通的日常里也有小惊喜哦'
+        ],
+        low: [
+            '🍃 运气稍弱，但坏事也会过去的~',
+            '🌙 低谷之后就是上升期，坚持一下~',
+            '💭 即使运气不好，也别忘了照顾好自己~',
+            '🌤️ 乌云会散去的，好运正在路上~',
+            '🤗 运气不好的时候，就对自己好一点吧'
+        ],
+        critical: [
+            '🌈 最坏的时刻过去就会好起来的~',
+            '💝 即使今天不顺，也要好好爱自己~',
+            '🌙 今天就宅在家里休息，明天会更好~',
+            '🍵 喝杯热饮，静静等待转机的到来~',
+            '🤗 记住，你本身就是最大的幸运~'
+        ]
     }
 };
 
@@ -1068,20 +1391,42 @@ function getRandomAdvice(arr) {
     return arr[Math.floor(Math.random() * arr.length)];
 }
 
+function getRandomActionAdvice() {
+    // 随机选择一种类型的行动建议
+    const categories = Object.keys(ActionAdvice);
+    const randomCategory = categories[Math.floor(Math.random() * categories.length)];
+    const categoryAdvice = ActionAdvice[randomCategory];
+    return getRandomAdvice(categoryAdvice);
+}
+
 function updateAdvice() {
-    const { mood, stress, energy } = State.stats;
-    const priorities = [{ name: 'mood', value: mood }, { name: 'stress', value: stress }, { name: 'energy', value: energy }];
+    const { mood, stress, energy, lucky } = State.stats;
+    const priorities = [
+        { name: 'mood', value: mood },
+        { name: 'stress', value: stress },
+        { name: 'energy', value: energy },
+        { name: 'lucky', value: lucky }
+    ];
     priorities.sort((a, b) => a.value - b.value);
 
+    let html = '';
+
+    // 最紧急的建议（状态最差的那个）
     const urgentItem = priorities[0];
     const urgentLevel = getAdviceLevel(urgentItem.value);
-    let html = `<p class="advice-item">${getRandomAdvice(AdviceLibrary[urgentItem.name][urgentLevel])}</p>`;
+    html += `<p class="advice-item">${getRandomAdvice(AdviceLibrary[urgentItem.name][urgentLevel])}</p>`;
 
+    // 如果有第二个状态不好的，也给出建议
     const secondItem = priorities[1];
     if (secondItem && secondItem.value < 50) {
         const secondLevel = getAdviceLevel(secondItem.value);
         html += `<p class="advice-item">${getRandomAdvice(AdviceLibrary[secondItem.name][secondLevel])}</p>`;
     }
+
+    // 添加具体的行动建议
+    const actionAdvice = getRandomActionAdvice();
+    html += `<p class="advice-item">${actionAdvice}</p>`;
+
     const adviceList = document.getElementById('advice-list');
     if (adviceList) adviceList.innerHTML = html;
 }
@@ -1100,11 +1445,14 @@ function submitVent() {
     const moodBefore = State.stats.mood;
     const stressBefore = State.stats.stress;
     const energyBefore = State.stats.energy;
+    const luckyBefore = State.stats.lucky;
     const impact = analyzeMoodImpact(selectedMood, ventText);
 
     State.stats.mood = Math.max(0, Math.min(100, State.stats.mood + impact.mood));
     State.stats.stress = Math.max(0, Math.min(100, State.stats.stress + impact.stress));
     State.stats.energy = Math.max(0, Math.min(100, State.stats.energy + impact.energy));
+    // 倾诉可以稍微提升幸运值，因为表达情绪会带来好运
+    State.stats.lucky = Math.max(0, Math.min(100, State.stats.lucky + 3));
 
     State.history.push({ mood: selectedMood, text: ventText || '（无详细描述）', time: moodTime || new Date().toISOString() });
     State.joyValue = Math.max(0, State.joyValue - 5);
@@ -1115,7 +1463,8 @@ function submitVent() {
         timestamp: moodTime || new Date().toISOString(),
         moodBefore, moodAfter: State.stats.mood,
         stressBefore, stressAfter: State.stats.stress,
-        energyBefore, energyAfter: State.stats.energy
+        energyBefore, energyAfter: State.stats.energy,
+        luckyBefore, luckyAfter: State.stats.lucky
     };
     addRecord(record);
 
@@ -1138,19 +1487,25 @@ function submitVent() {
 
 function analyzeMoodImpact(moodType, text) {
     const impacts = {
-        happy: { mood: 15, stress: -10, energy: 5 },
-        calm: { mood: 5, stress: -5, energy: 5 },
-        excited: { mood: 10, stress: 5, energy: 10 },
-        anxious: { mood: -10, stress: 15, energy: -5 },
-        sad: { mood: -15, stress: 5, energy: -10 },
-        angry: { mood: -20, stress: 20, energy: -15 }
+        happy: { mood: 15, stress: -10, energy: 5, lucky: 5 },
+        calm: { mood: 5, stress: -5, energy: 5, lucky: 3 },
+        excited: { mood: 10, stress: 5, energy: 10, lucky: 8 },
+        anxious: { mood: -10, stress: 15, energy: -5, lucky: -5 },
+        sad: { mood: -15, stress: 5, energy: -10, lucky: -3 },
+        angry: { mood: -20, stress: 20, energy: -15, lucky: -8 }
     };
 
     let impact = { ...impacts[moodType] };
     ['压力', '焦虑', '失眠', '疲惫'].forEach(w => { if (text.includes(w)) { impact.stress += 5; impact.energy -= 5; } });
-    ['开心', '成功', '顺利', '进步'].forEach(w => { if (text.includes(w)) { impact.mood += 5; } });
+    ['开心', '成功', '顺利', '进步'].forEach(w => { if (text.includes(w)) { impact.mood += 5; impact.lucky += 3; } });
+    ['幸运', '好运', '惊喜'].forEach(w => { if (text.includes(w)) { impact.lucky += 5; } });
 
-    return { mood: Math.round(impact.mood), stress: Math.round(impact.stress), energy: Math.round(impact.energy) };
+    return {
+        mood: Math.round(impact.mood),
+        stress: Math.round(impact.stress),
+        energy: Math.round(impact.energy),
+        lucky: Math.round(impact.lucky)
+    };
 }
 
 // ========== 换装弹窗 ==========
@@ -1518,7 +1873,7 @@ function showHoverBubble() {
     if (bubble) bubble.classList.add('show');
 }
 
-function showBubble(text) {
+function showBubble(text, duration = 2600) {
     const bubbleText = document.getElementById('bubble-text');
     const bubble = document.getElementById('pet-bubble');
     if (bubbleText) bubbleText.textContent = text;
@@ -1527,7 +1882,7 @@ function showBubble(text) {
     Timers.bubbleTimeout = setTimeout(() => {
         const b = document.getElementById('pet-bubble');
         if (b) b.classList.remove('show');
-    }, 2600);
+    }, duration);
 }
 
 function hideBubble() {
@@ -1826,7 +2181,7 @@ function stopRegionDetection() {
 }
 
 function startPetAI() {
-    if (document.hidden || State.isFirstVisit) return;
+    if (document.hidden || !State.isSetupComplete) return;
     if (Timers.moveTimeout) clearTimeout(Timers.moveTimeout);
 
     Timers.moveTimeout = setTimeout(() => {
@@ -1838,8 +2193,138 @@ function startPetAI() {
     }, 6200 + Math.random() * 6000);
 }
 
+// ========== 移动时情绪小语言 ==========
+const MoodWalkPhrases = {
+    // 高心情
+    happy: [
+        '今天的阳光好温暖呀~ ☀️',
+        '心情美美哒！✨',
+        '想去找点好吃的！🍰',
+        '出来散散步真舒服~ 🌸',
+        '这风景真不错！🌈',
+        '好开心呀~ 💕'
+    ],
+    // 中等心情
+    calm: [
+        '慢悠悠地走一走~ 🚶',
+        '吹吹风，放松一下 🌿',
+        '这里真安静... 🍃',
+        '享受当下的时光 ☕',
+        '世界很美好~ 🌼',
+        '慢慢来，不着急 🌱'
+    ],
+    // 低心情
+    sad: [
+        '出来透透气吧... 🌧️',
+        '散散心会好一点的 💭',
+        '深呼吸，慢慢走~ 🌊',
+        '乌云会散的... 🌤️',
+        '给自己一点时间 🌙',
+        '一切都会好起来的 💝'
+    ],
+    // 临界/很差心情
+    sad_critical: [
+        '需要抱抱吗... 🤗',
+        '记得你很棒哦 💖',
+        '别忘了照顾自己 🌷',
+        '我在这里陪着你 🫂',
+        '休息一下再出发 🌸',
+        '慢慢来，你已经很好 💕'
+    ],
+    // 高能量
+    energetic: [
+        '充满力量！⚡',
+        '冲冲冲！🚀',
+        '精神满满~ 💪',
+        '今天效率超高！🎯',
+        '动起来！🏃',
+        '干劲十足！🔥'
+    ],
+    // 低能量
+    tired: [
+        '有点累了... 😴',
+        '休息一下再走~ 🛋️',
+        '慢慢挪动~ 🐌',
+        '需要充充电... 🔋',
+        '慢一点也没关系 🌙',
+        '给自己放个假吧 ~ 💤'
+    ],
+    // 高压力
+        highStress: [
+        '深呼吸~ 🌬️',
+        '放轻松... 🌊',
+        '压力会过去的 🌈',
+        '别太紧绷了 🌿',
+        '慢下来休息一下吧 🧘',
+        '一切都会顺利的 ~ ✨'
+    ],
+    // 高幸运
+    lucky: [
+        '今天运气好好！🍀',
+        '好事要发生哦~ ✨',
+        '好幸运呀~ 🌟',
+        '期待惊喜！🎁',
+        '幸运女神眷顾~ 💫',
+        '今天会是美好的一天~ 🌈'
+    ],
+    // 一般状态
+    normal: [
+        '出去走走吧~ 🌸',
+        '换个地方看看 🌿',
+        '探索一下新地方~ 🔍',
+        '天气不错呢 ☀️',
+        '出去透透气 🚶',
+        '发现有趣的地方~ ✨'
+    ]
+};
+
+function getMoodWalkPhrase() {
+    const { mood, stress, energy, lucky } = State.stats;
+
+    // 优先检查最需要关注的指标
+    // 心情很差
+    if (mood < 20) {
+        return MoodWalkPhrases.sad_critical[Math.floor(Math.random() * MoodWalkPhrases.sad_critical.length)];
+    }
+    // 能量很低
+    if (energy < 20) {
+        return MoodWalkPhrases.tired[Math.floor(Math.random() * MoodWalkPhrases.tired.length)];
+    }
+    // 压力很高
+    if (stress > 70) {
+        return MoodWalkPhrases.highStress[Math.floor(Math.random() * MoodWalkPhrases.highStress.length)];
+    }
+    // 心情好
+    if (mood >= 70) {
+        return MoodWalkPhrases.happy[Math.floor(Math.random() * MoodWalkPhrases.happy.length)];
+    }
+    // 能量高
+    if (energy >= 70) {
+        return MoodWalkPhrases.energetic[Math.floor(Math.random() * MoodWalkPhrases.energetic.length)];
+    }
+    // 幸运值高
+    if (lucky >= 70) {
+        return MoodWalkPhrases.lucky[Math.floor(Math.random() * MoodWalkPhrases.lucky.length)];
+    }
+    // 心情低
+    if (mood < 40) {
+        return MoodWalkPhrases.sad[Math.floor(Math.random() * MoodWalkPhrases.sad.length)];
+    }
+    // 心情中等或平静
+    if (mood >= 40 && mood < 70) {
+        return MoodWalkPhrases.calm[Math.floor(Math.random() * MoodWalkPhrases.calm.length)];
+    }
+    // 默认
+    return MoodWalkPhrases.normal[Math.floor(Math.random() * MoodWalkPhrases.normal.length)];
+}
+
 function movePet() {
     if (!floatingPet) return;
+
+    // 移动前显示情绪小语言（随机30%概率显示）
+    if (Math.random() < 0.3) {
+        showBubble(getMoodWalkPhrase(), 2500);
+    }
 
     const regionIds = Object.keys(MapRegions).filter((regionId) => MapRegions[regionId] && regionId !== currentRegion);
     const nextRegion = regionIds[Math.floor(Math.random() * regionIds.length)] || currentRegion || 'calm';
@@ -1898,7 +2383,7 @@ function movePetToRegionCenter(regionId) {
         warm: { x: bounds.minX + (bounds.maxX - bounds.minX) * 0.25, y: bounds.minY + (bounds.maxY - bounds.minY) * 0.4 },
         active: { x: bounds.minX + (bounds.maxX - bounds.minX) * 0.75, y: bounds.minY + (bounds.maxY - bounds.minY) * 0.4 },
         calm: { x: bounds.minX + (bounds.maxX - bounds.minX) * 0.5, y: bounds.minY + (bounds.maxY - bounds.minY) * 0.7 },
-        park: { x: bounds.minX + (bounds.maxX - bounds.minX) * 0.25, y: bounds.minY + (bounds.maxY - bounds.minY) * 0.7 }
+        park: { x: bounds.minX + (bounds.maxX - bounds.minX) * 0.15, y: bounds.minY + (bounds.maxY - bounds.minY) * 0.55 }
     };
 
     const target = regionPositions[regionId] || { x: petX, y: petY };

@@ -70,12 +70,12 @@ const RegionSensors = {
 
 const PetRouteLibrary = {
     park: [
-        { x: -6.1, y: 1.32, z: -1.7 },
-        { x: -5.4, y: 1.34, z: -1.0 },
-        { x: -4.6, y: 1.36, z: -0.3 },
-        { x: -3.7, y: 1.42, z: 0.6 },
-        { x: -2.7, y: 1.46, z: 1.4 },
-        { x: -1.5, y: 1.5, z: 2.0 }
+        { x: -7.0, y: 1.34, z: -2.5 },
+        { x: -6.2, y: 1.35, z: -1.8 },
+        { x: -5.5, y: 1.36, z: -1.0 },
+        { x: -4.8, y: 1.36, z: -0.2 },
+        { x: -5.5, y: 1.36, z: 0.6 },
+        { x: -6.5, y: 1.35, z: 0.0 }
     ],
     warm: [
         { x: -0.3, y: 1.16, z: 6.8 },
@@ -631,10 +631,12 @@ function createTerrainPlatforms() {
 
     const rightBank = createExtrudedPolygon(
         [
-            { x: 7.6, z: 4.8 },
-            { x: 11.4, z: 5.6 },
-            { x: 11.7, z: 7.8 },
-            { x: 8.0, z: 7.1 }
+            { x: 7.6, z: 2.0 },
+            { x: 11.4, z: 3.0 },
+            { x: 14.5, z: 5.0 },
+            { x: 15.0, z: 8.5 },
+            { x: 12.0, z: 9.0 },
+            { x: 8.0, z: 8.0 }
         ],
         0.24,
         { color: 0x61788f, roughness: 0.94, metalness: 0.03 },
@@ -647,10 +649,11 @@ function createPlotAnchors() {
 }
 
 function createBridges() {
+    // 只创建一座桥 - 千厮门大桥，横跨嘉陵江，桥面高度增加避免嵌入地面
     const qiansimen = createCableBridge({
-        start: new THREE.Vector3(-10.2, 0.58, 2.8),
-        end: new THREE.Vector3(1.2, 0.78, 4.8),
-        deckWidth: 0.92,
+        start: new THREE.Vector3(-10.5, 1.6, 7.8),
+        end: new THREE.Vector3(-3.5, 1.8, 9.2),
+        deckWidth: 0.9,
         bridgeColor: Palette.bridge,
         trussColor: Palette.bridgeTruss,
         labelText: '千厮门大桥',
@@ -659,22 +662,9 @@ function createBridges() {
     });
     chongqingScene.add(qiansimen.group);
 
-    const dongshuimen = createCableBridge({
-        start: new THREE.Vector3(3.5, 0.76, 4.5),
-        end: new THREE.Vector3(11.0, 0.7, 6.4),
-        deckWidth: 0.94,
-        bridgeColor: Palette.bridge,
-        trussColor: Palette.bridgeTruss,
-        labelText: '东水门大桥',
-        labelOffset: new THREE.Vector3(1.7, 0.15, 0),
-        pylonOffsets: [-1.2, 2.4]
-    });
-    chongqingScene.add(dongshuimen.group);
-
+    // 添加车流动画
     animatedActors.push(createBridgeCarActor(qiansimen.group, qiansimen.length, 0.16, -0.18, Palette.warmBase, 0.0, 0.14));
     animatedActors.push(createBridgeCarActor(qiansimen.group, qiansimen.length, 0.18, 0.16, 0x5f9cc7, 0.42, -0.12));
-    animatedActors.push(createBridgeCarActor(dongshuimen.group, dongshuimen.length, 0.18, -0.18, 0xc4624d, 0.18, 0.16));
-    animatedActors.push(createBridgeCarActor(dongshuimen.group, dongshuimen.length, 0.2, 0.16, 0x8dc16f, 0.63, -0.15));
 }
 
 function createParkDistrict() {
@@ -904,28 +894,32 @@ function createRiverfrontDistrict() {
 }
 
 function createAmbientProps() {
+    // 左侧天际线：只保留公园区域外的建筑，避免遮挡绿色公园区域
     const skylineLeft = new THREE.Group();
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 2; i++) {
         const tower = createForegroundTower(
-            1.3 + (i % 4) * 0.5,
+            1.3 + (i % 2) * 0.5,
             0.9 + (i % 3) * 0.08,
             0.9 + ((i + 1) % 3) * 0.06,
             i % 2 === 0 ? 0x6f7aa1 : 0x5f6f92
         );
+        // 只在公园区域左侧外围放置建筑（x < -9）
         tower.position.set(-11.8 + i * 2.4, 0.4, -1.0 + (i % 3) * 0.25);
         skylineLeft.add(tower);
     }
     chongqingScene.add(skylineLeft);
 
     const skylineRight = new THREE.Group();
+    // 右侧天际线建筑群：紧凑排列在右侧江岸平台上，远离来福士
     for (let i = 0; i < 4; i++) {
         const tower = createForegroundTower(
-            1.6 + (i % 5) * 0.52,
-            0.9 + (i % 2) * 0.08,
-            0.86 + ((i + 2) % 3) * 0.08,
+            1.4 + (i % 3) * 0.4,
+            0.85 + (i % 2) * 0.06,
+            0.82 + ((i + 1) % 2) * 0.06,
             i % 2 === 0 ? 0x717ca6 : 0x616b93
         );
-        tower.position.set(9.0 + i * 2.8, 0.45, 0.2 + (i % 3) * 0.28);
+        // 紧凑排列在右侧江岸平台上方
+        tower.position.set(9.8 + i * 1.8, 0.38, 3.8 + (i % 2) * 1.2);
         skylineRight.add(tower);
     }
     chongqingScene.add(skylineRight);
