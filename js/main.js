@@ -279,7 +279,14 @@ function recycleParticle(p) {
 // ========== 初始化 ==========
 document.addEventListener('DOMContentLoaded', () => {
     loadState();
-    initThreeCity();
+    // 使用改进的重庆城市地图 [基于 CubeCity 源代码改进]
+    if (window.initChongqingCity) {
+        window.initChongqingCity();
+    } else {
+        // 降级方案：如果新文件未加载，使用原有函数
+        console.warn('chongqing-city.js 未加载，使用默认初始化');
+        initThreeCity();
+    }
     initUI();
     initFloatingPet();
     if (!State.isFirstVisit) {
@@ -651,9 +658,19 @@ function onCityMouseMove(event) {
 }
 
 function onCityClick(event) {
-    // 如果点击的是宠物或宠物的子元素，不处理
-    if (event.target.closest('#floating-pet')) {
-        return;
+    // 如果点击的是宠物或宠物容器，不处理
+    const petContainer = document.getElementById('pet-container');
+    const floatingPet = document.getElementById('floating-pet');
+    if (petContainer && floatingPet) {
+        const petRect = floatingPet.getBoundingClientRect();
+        // 检查点击位置是否在宠物边界内（考虑一定容忍度）
+        const tolerance = 20;
+        if (event.clientX >= petRect.left - tolerance && 
+            event.clientX <= petRect.right + tolerance &&
+            event.clientY >= petRect.top - tolerance && 
+            event.clientY <= petRect.bottom + tolerance) {
+            return;
+        }
     }
     
     const canvas = event.target;
@@ -1335,17 +1352,34 @@ function bindPetInteraction() {
         dragMoved = false;
         State.isDragging = true;
         floatingPet.classList.add('dragging');
+        
+        // 保存鼠标的视口坐标
         dragStartX = clientX;
         dragStartY = clientY;
+        
+        // 保存宠物当前位置（容器相对坐标）
         petStartX = petX;
         petStartY = petY;
+        
         return true;
     };
 
     const applyDrag = (clientX, clientY) => {
         if (!State.isDragging) return;
-        const dx = clientX - dragStartX;
-        const dy = clientY - dragStartY;
+        
+        // 获取容器的边界
+        const container = document.getElementById('pet-container');
+        if (!container) return;
+        const containerRect = container.getBoundingClientRect();
+        
+        // 将鼠标坐标转换为相对于容器的坐标
+        const mouseContainerX = clientX - containerRect.left;
+        const mouseContainerY = clientY - containerRect.top;
+        
+        // 计算鼠标相对于初始点击位置的偏移（使用容器相对坐标）
+        const dx = mouseContainerX - (dragStartX - containerRect.left);
+        const dy = mouseContainerY - (dragStartY - containerRect.top);
+        
         if (Math.abs(dx) > 5 || Math.abs(dy) > 5) dragMoved = true;
 
         const clamped = clampPetPosition(petStartX + dx, petStartY + dy);
@@ -1360,14 +1394,18 @@ function bindPetInteraction() {
         floatingPet.classList.remove('dragging');
         
         // 只有当用户实际拖拽了宠物，才更新位置和区域
-        if (dragged) {
+        if (dragMoved) {
             State.position = { x: petX, y: petY };
             State.wanderMode = false;
             saveState();
+            
+            // 拖拽后禁用点击动作一段时间，防止误触
+            State.justDragged = true;
             setTimeout(() => {
+                State.justDragged = false;
                 if (!State.isDragging) State.wanderMode = true;
             }, 30000);
-
+            
             const region = detectCurrentRegion();
             if (region) onRegionEnter(region);
         }
@@ -1400,6 +1438,11 @@ function bindPetInteraction() {
 
     if (floatingPet) {
         floatingPet.addEventListener('click', (e) => {
+            // 如果刚刚拖拽过，不处理点击
+            if (State.justDragged) {
+                dragMoved = false;
+                return;
+            }
             if (dragMoved) {
                 dragMoved = false;
                 return;
@@ -1417,15 +1460,10 @@ function bindPetInteraction() {
 }
 
 function handlePetClick(e) {
-    // 阻止事件冒泡，防止触发地图点击
-    if (e) {
-        e.stopPropagation();
-        e.preventDefault();
-    }
-    
     State.clickCount++;
     State.joyValue = Math.min(100, State.joyValue + 6);
     hideBubble();
+
 
 
     if (State.clickCount >= 5) {
@@ -1531,7 +1569,66 @@ function updatePetPosition() {
     if (floatingPet) {
         floatingPet.style.left = `${petX}px`;
         floatingPet.style.top = `${petY}px`;
+
+        const bounds = getSceneBounds();
+        const spanY = Math.max(bounds.maxY - bounds.minY, 1);
+        const depth = Math.max(0, Math.min(1, (petY - bounds.minY) / spanY));
+        const petScale = 0.78 + depth * 0.28;
+        const shadowScale = 0.82 + depth * 0.22;
+        const shadowOpacity = 0.22 + depth * 0.13;
+
+        floatingPet.style.setProperty('--pet-scale', petScale.toFixed(3));
+        floatingPet.style.setProperty('--pet-shadow-scale', shadowScale.toFixed(3));
+        floatingPet.style.setProperty('--pet-shadow-opacity', shadowOpacity.toFixed(3));
+        floatingPet.style.zIndex = String(950 + Math.round(depth * 40));
     }
+}
+
+function getChongqingProjectedRoute(regionId) {
+    if (typeof window.getChongqingRoutePoints !== 'function' || typeof window.projectChongqingWorldPoint !== 'function') {
+        return [];
+    }
+
+    return window.getChongqingRoutePoints(regionId)
+        .map((point) => window.projectChongqingWorldPoint(point))
+        .filter(Boolean);
+}
+
+function movePetAlongRoute(screenPoints, regionId = null) {
+    if (!screenPoints || screenPoints.length === 0) {
+        return false;
+    }
+
+    const route = [{ x: petX, y: petY }, ...screenPoints];
+    const deduped = [];
+    route.forEach((point) => {
+        const prev = deduped[deduped.length - 1];
+        if (!prev || Math.hypot(point.x - prev.x, point.y - prev.y) > 6) {
+            deduped.push(point);
+        }
+    });
+
+    if (deduped.length < 2) {
+        return false;
+    }
+
+    const stepToPoint = (index) => {
+        const target = deduped[index];
+        const isFinal = index >= deduped.length - 1;
+
+        movePetTo(target.x, target.y, {
+            regionId: isFinal ? regionId : null,
+            finalizeRegionEnter: isFinal,
+            onComplete: () => {
+                if (!isFinal) {
+                    stepToPoint(index + 1);
+                }
+            }
+        });
+    };
+
+    stepToPoint(1);
+    return true;
 }
 
 // ========== 眨眼系统 ==========
@@ -1744,14 +1841,12 @@ function startPetAI() {
 function movePet() {
     if (!floatingPet) return;
 
-    const bounds = getSceneBounds();
-    const targetX = bounds.minX + Math.random() * (bounds.maxX - bounds.minX);
-    const targetY = bounds.minY + Math.random() * (bounds.maxY - bounds.minY);
-
-    movePetTo(targetX, targetY);
+    const regionIds = Object.keys(MapRegions).filter((regionId) => MapRegions[regionId] && regionId !== currentRegion);
+    const nextRegion = regionIds[Math.floor(Math.random() * regionIds.length)] || currentRegion || 'calm';
+    movePetToRegionCenter(nextRegion);
 }
 
-function movePetTo(targetX, targetY, { regionId = null } = {}) {
+function movePetTo(targetX, targetY, { regionId = null, finalizeRegionEnter = true, onComplete = null } = {}) {
     if (!floatingPet) return;
 
     const clamped = clampPetPosition(targetX, targetY);
@@ -1770,22 +1865,34 @@ function movePetTo(targetX, targetY, { regionId = null } = {}) {
     updatePetPosition();
 
     Timers.moveTimeout = setTimeout(() => {
-        Timers.isMoving = false;
-        floatingPet.classList.remove('moving');
         State.position = { x: petX, y: petY };
         saveState();
 
-        const nextRegion = regionId ? MapRegions[regionId] : detectCurrentRegion();
-        if (nextRegion) onRegionEnter(nextRegion);
-        else {
-            currentRegion = null;
+        if (finalizeRegionEnter) {
+            Timers.isMoving = false;
+            floatingPet.classList.remove('moving');
+
+            const nextRegion = regionId ? MapRegions[regionId] : detectCurrentRegion();
+            if (nextRegion) onRegionEnter(nextRegion);
+            else {
+                currentRegion = null;
+            }
+
+            startPetAI();
         }
 
-        startPetAI();
+        if (typeof onComplete === 'function') {
+            onComplete();
+        }
     }, duration + 40);
 }
 
 function movePetToRegionCenter(regionId) {
+    const projectedRoute = getChongqingProjectedRoute(regionId);
+    if (movePetAlongRoute(projectedRoute, regionId)) {
+        return;
+    }
+
     const bounds = getSceneBounds();
     const regionPositions = {
         warm: { x: bounds.minX + (bounds.maxX - bounds.minX) * 0.25, y: bounds.minY + (bounds.maxY - bounds.minY) * 0.4 },
