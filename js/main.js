@@ -254,18 +254,11 @@ const Timers = {
 
 // ========== DOM引用 ==========
 let floatingPet, petBody, petSvg, particleCanvas, particleCtx;
-let mapHoverCard, mapHoverTitle, mapHoverText;
 let petX = 0, petY = 0;
 let particles = [];
 const MAX_PARTICLES = 20;
 const PET_WIDTH = 190;
 const PET_HEIGHT = 210;
-
-// ========== Three.js 城市场景 ==========
-let scene, camera, renderer, cityContainer;
-let districtMeshes = {};
-let raycaster, mouse;
-let currentHoveredDistrict = null;
 
 // ========== 粒子对象池 ==========
 const particlePool = [];
@@ -293,6 +286,31 @@ function initWelcomeScreen() {
         welcomeScreen.style.display = 'none';
         return;
     }
+
+    // 添加浮动文字背景
+    const encouragingTexts = [
+        '你很棒', '今天也会是美好的一天', '相信自己', '每一步都是进步',
+        '值得被爱', '生活因你而精彩', '保持微笑', '一切都会好的',
+        '你比自己想象的更强大', '今天也要加油哦', '慢慢来', '你可以的',
+        '每一天都是新的开始', '温柔对待自己', '世界因你而美好',
+        '勇敢前行', '你是独一无二的', '让光照进来', '拥抱每一天',
+        '活在当下', '感受生活的美好', '给自己一个拥抱'
+    ];
+
+    // 清除旧的浮动文字
+    welcomeScreen.querySelectorAll('.floating-text').forEach(el => el.remove());
+
+    // 创建浮动文字
+    encouragingTexts.forEach((text, index) => {
+        const floatEl = document.createElement('div');
+        floatEl.className = 'floating-text';
+        floatEl.textContent = text;
+        floatEl.style.setProperty('--left', `${10 + Math.random() * 80}%`);
+        floatEl.style.setProperty('--duration', `${10 + Math.random() * 8}s`);
+        floatEl.style.animationDelay = `${Math.random() * 12}s`;
+        floatEl.style.fontSize = `${14 + Math.random() * 10}px`;
+        welcomeScreen.appendChild(floatEl);
+    });
 
     // 确保欢迎页面显示
     welcomeScreen.style.display = 'flex';
@@ -433,7 +451,11 @@ function completeSetup(useDefaults = false) {
     updateSidebar();
     updateFloatingPetAppearance();
     updateAdvice();
-    startPetAI();
+
+    // 启动随机移动
+    if (State.wanderMode) {
+        setTimeout(movePetRandomly, 3000 + Math.random() * 3000);
+    }
 
     // 显示欢迎提示
     setTimeout(() => {
@@ -444,437 +466,13 @@ function completeSetup(useDefaults = false) {
 // ========== 初始化 ==========
 document.addEventListener('DOMContentLoaded', () => {
     loadState();
+    // 强制显示欢迎页面（用于调试，用户重新选择宠物）
+    State.isSetupComplete = false;
     // 初始化欢迎/设置页面
     initWelcomeScreen();
-    // 使用改进的重庆城市地图 [基于 CubeCity 源代码改进]
-    if (window.initChongqingCity) {
-        window.initChongqingCity();
-    } else {
-        // 降级方案：如果新文件未加载，使用原有函数
-        console.warn('chongqing-city.js 未加载，使用默认初始化');
-        initThreeCity();
-    }
     initUI();
     initFloatingPet();
-    // 注意：宠物AI移动和自动移动在completeSetup中启动，不再在此启动
 });
-
-// ========== Three.js 城市初始化 ==========
-function initThreeCity() {
-    cityContainer = document.getElementById('city-container');
-    const canvas = document.getElementById('city-canvas');
-    if (!cityContainer || !canvas) return;
-
-    // 场景
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x1a2a3a);
-    scene.fog = new THREE.Fog(0x1a2a3a, 30, 80);
-
-    // 正交相机（等距视角，模拟2.5D）
-    const aspect = cityContainer.clientWidth / cityContainer.clientHeight;
-    const frustumSize = 24;
-    camera = new THREE.OrthographicCamera(
-        frustumSize * aspect / -2,
-        frustumSize * aspect / 2,
-        frustumSize / 2,
-        frustumSize / -2,
-        0.1,
-        100
-    );
-    // 等距视角角度
-    camera.position.set(18, 16, 18);
-    camera.lookAt(0, 0, 0);
-    camera.up.set(0, 1, 0);
-
-    // 渲染器
-    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
-    renderer.setSize(cityContainer.clientWidth, cityContainer.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-    // 灯光
-    const ambientLight = new THREE.AmbientLight(0x404060, 0.6);
-    scene.add(ambientLight);
-
-    const dirLight = new THREE.DirectionalLight(0xffeedd, 0.8);
-    dirLight.position.set(10, 20, 10);
-    dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 1024;
-    dirLight.shadow.mapSize.height = 1024;
-    scene.add(dirLight);
-
-    const hemiLight = new THREE.HemisphereLight(0x88aacc, 0x445522, 0.3);
-    scene.add(hemiLight);
-
-    // 地面
-    const groundGeo = new THREE.PlaneGeometry(40, 40);
-    const groundMat = new THREE.MeshLambertMaterial({ color: 0x2a3a2a });
-    const ground = new THREE.Mesh(groundGeo, groundMat);
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.1;
-    ground.receiveShadow = true;
-    scene.add(ground);
-
-    // 创建重庆风格建筑群
-    createChongqingCity();
-
-    // 射线拾取
-    raycaster = new THREE.Raycaster();
-    mouse = new THREE.Vector2();
-
-    // 交互
-    canvas.addEventListener('mousemove', onCityMouseMove, false);
-    canvas.addEventListener('click', onCityClick, false);
-
-    // 窗口 resize
-    window.addEventListener('resize', onCityResize, false);
-
-    // 动画循环
-    animateCity();
-}
-
-function createChongqingCity() {
-    // 地基 - 山城地形（多层平台）
-    createTerrace(0, 0, 8, 1.5, 0x3a4a3a, 'ground1');
-    createTerrace(-3, 1, 7, 1.2, 0x3a4a3a, 'ground2');
-    createTerrace(3, -1, 6, 1.0, 0x3a4a3a, 'ground3');
-    createTerrace(-5, -1, 5, 0.8, 0x3a4a3a, 'ground4');
-
-    // 道路
-    createRoad(0, 0.1, 12, 0.15, 0x556655, 'road-main');
-    createRoad(-4, 1.1, 0.15, 8, 0x556655, 'road-v');
-    createRoad(4, -0.5, 8, 0.15, 0x556655, 'road-2');
-
-    // 洪崖洞（暖色阶梯形建筑群）
-    createHongyaodong();
-
-    // 来福士（现代玻璃塔楼）
-    createRaffles();
-
-    // 江岸区域
-    createRiverSide();
-
-    // 山坡公园
-    createHillPark();
-
-    // 装饰元素
-    createDecorations();
-}
-
-function createTerrace(x, z, size, height, color, name) {
-    const geo = new THREE.BoxGeometry(size, height, size);
-    const mat = new THREE.MeshLambertMaterial({ color: color });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(x, height / 2, z);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    scene.add(mesh);
-}
-
-function createRoad(x, z, width, depth, color, name) {
-    const geo = new THREE.BoxGeometry(width, 0.08, depth);
-    const mat = new THREE.MeshLambertMaterial({ color: color });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(x, 0.05, z);
-    mesh.receiveShadow = true;
-    scene.add(mesh);
-}
-
-function createHongyaodong() {
-    // 洪崖洞：阶梯形吊脚楼风格，暖色调
-    const baseX = -4, baseZ = 2;
-    const colors = [0xff8844, 0xee7733, 0xdd6622, 0xcc5500, 0xbb4400];
-
-    for (let floor = 0; floor < 5; floor++) {
-        const width = 3.5 - floor * 0.4;
-        const depth = 2.5 - floor * 0.2;
-        const height = 0.8;
-        const y = floor * 0.85;
-
-        const geo = new THREE.BoxGeometry(width, height, depth);
-        const mat = new THREE.MeshLambertMaterial({ color: colors[floor] });
-        const mesh = new THREE.Mesh(geo, mat);
-        mesh.position.set(baseX, y + height / 2, baseZ);
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        scene.add(mesh);
-
-        // 窗户
-        addWindows(mesh, width, height, depth, 0xffff88);
-    }
-
-    // 区域感应器
-    const hitGeo = new THREE.BoxGeometry(4, 4, 3);
-    const hitMat = new THREE.MeshBasicMaterial({ visible: false });
-    const hitMesh = new THREE.Mesh(hitGeo, hitMat);
-    hitMesh.position.set(baseX, 2, baseZ);
-    hitMesh.userData = { region: 'warm' };
-    scene.add(hitMesh);
-    districtMeshes['warm'] = hitMesh;
-}
-
-function createRaffles() {
-    // 来福士：现代玻璃塔楼
-    const baseX = 5, baseZ = 1;
-    const towerPositions = [
-        [0, 0], [1.2, 0], [2.4, 0], [-1.2, 0.5]
-    ];
-
-    towerPositions.forEach(([dx, dz], i) => {
-        const height = 3 + Math.random() * 2;
-        const geo = new THREE.BoxGeometry(0.6, height, 0.6);
-        const mat = new THREE.MeshPhongMaterial({
-            color: 0x88aacc,
-            shininess: 80,
-            specular: 0x4488ff
-        });
-        const mesh = new THREE.Mesh(geo, mat);
-        mesh.position.set(baseX + dx, height / 2, baseZ + dz);
-        mesh.castShadow = true;
-        scene.add(mesh);
-
-        // 玻璃反光条
-        addGlassStrips(mesh, height);
-    });
-
-    // 区域感应器
-    const hitGeo = new THREE.BoxGeometry(4, 4, 3);
-    const hitMat = new THREE.MeshBasicMaterial({ visible: false });
-    const hitMesh = new THREE.Mesh(hitGeo, hitMat);
-    hitMesh.position.set(baseX + 0.6, 2, baseZ + 0.2);
-    hitMesh.userData = { region: 'active' };
-    scene.add(hitMesh);
-    districtMeshes['active'] = hitMesh;
-}
-
-function createRiverSide() {
-    // 江岸：蓝色水面 + 步道
-    const riverGeo = new THREE.PlaneGeometry(6, 2);
-    const riverMat = new THREE.MeshPhongMaterial({
-        color: 0x3366aa,
-        transparent: true,
-        opacity: 0.7,
-        shininess: 100
-    });
-    const river = new THREE.Mesh(riverGeo, riverMat);
-    river.rotation.x = -Math.PI / 2;
-    river.position.set(-2, 0.02, -3);
-    scene.add(river);
-
-    // 步道
-    const walkGeo = new THREE.BoxGeometry(5, 0.05, 0.8);
-    const walkMat = new THREE.MeshLambertMaterial({ color: 0x887766 });
-    const walk = new THREE.Mesh(walkGeo, walkMat);
-    walk.position.set(-2, 0.08, -2);
-    scene.add(walk);
-
-    // 区域感应器
-    const hitGeo = new THREE.BoxGeometry(6, 4, 3);
-    const hitMat = new THREE.MeshBasicMaterial({ visible: false });
-    const hitMesh = new THREE.Mesh(hitGeo, hitMat);
-    hitMesh.position.set(-2, 1, -2);
-    hitMesh.userData = { region: 'calm' };
-    scene.add(hitMesh);
-    districtMeshes['calm'] = hitMesh;
-}
-
-function createHillPark() {
-    // 山坡公园：绿色平台 + 树木
-    const baseX = -6, baseZ = -2;
-
-    // 多层绿色平台
-    for (let i = 0; i < 3; i++) {
-        const geo = new THREE.BoxGeometry(4 - i * 0.5, 0.3, 3 - i * 0.3);
-        const mat = new THREE.MeshLambertMaterial({ color: 0x44aa44 });
-        const mesh = new THREE.Mesh(geo, mat);
-        mesh.position.set(baseX, i * 0.5 + 0.15, baseZ - i * 0.5);
-        mesh.castShadow = true;
-        scene.add(mesh);
-    }
-
-    // 简单树木
-    for (let i = 0; i < 5; i++) {
-        const tx = baseX + (Math.random() - 0.5) * 3;
-        const tz = baseZ + (Math.random() - 0.5) * 2;
-        createSimpleTree(tx, tz, 0.5 + Math.random() * 0.5);
-    }
-
-    // 区域感应器
-    const hitGeo = new THREE.BoxGeometry(5, 4, 4);
-    const hitMat = new THREE.MeshBasicMaterial({ visible: false });
-    const hitMesh = new THREE.Mesh(hitGeo, hitMat);
-    hitMesh.position.set(baseX, 1, baseZ);
-    hitMesh.userData = { region: 'park' };
-    scene.add(hitMesh);
-    districtMeshes['park'] = hitMesh;
-}
-
-function createSimpleTree(x, z, size) {
-    // 树干
-    const trunkGeo = new THREE.CylinderGeometry(size * 0.1, size * 0.15, size * 0.8, 6);
-    const trunkMat = new THREE.MeshLambertMaterial({ color: 0x664422 });
-    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-    trunk.position.set(x, size * 0.4, z);
-    scene.add(trunk);
-
-    // 树冠（圆锥）
-    const crownGeo = new THREE.ConeGeometry(size * 0.5, size, 8);
-    const crownMat = new THREE.MeshLambertMaterial({ color: 0x228822 });
-    const crown = new THREE.Mesh(crownGeo, crownMat);
-    crown.position.set(x, size * 1.1, z);
-    crown.castShadow = true;
-    scene.add(crown);
-}
-
-function addWindows(building, width, height, depth, windowColor) {
-    // 简化：在建筑表面添加小方块作为窗户
-    const windowSize = 0.08;
-    const rows = Math.floor(height / 0.25);
-    const cols = Math.floor(width / 0.3);
-
-    for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-            if (Math.random() > 0.6) continue; // 不是每个位置都有窗
-            const geo = new THREE.BoxGeometry(windowSize, windowSize, 0.02);
-            const mat = new THREE.MeshBasicMaterial({ color: windowColor });
-            const win = new THREE.Mesh(geo, mat);
-
-            const x = -width / 2 + (c + 0.5) * (width / cols);
-            const y = -height / 2 + (r + 0.5) * (height / rows);
-            const z = depth / 2 + 0.01;
-
-            win.position.set(
-                building.position.x + x,
-                building.position.y + y,
-                building.position.z + z
-            );
-            scene.add(win);
-        }
-    }
-}
-
-function addGlassStrips(tower, height) {
-    // 玻璃反光效果
-    const stripGeo = new THREE.BoxGeometry(0.62, height, 0.01);
-    const stripMat = new THREE.MeshBasicMaterial({
-        color: 0xaaccff,
-        transparent: true,
-        opacity: 0.4
-    });
-    const strip = new THREE.Mesh(stripGeo, stripMat);
-    strip.position.set(tower.position.x, tower.position.y, tower.position.z + 0.31);
-    scene.add(strip);
-}
-
-function createDecorations() {
-    // 路灯
-    createLampPost(-3, 0.5);
-    createLampPost(0, 0.5);
-    createLampPost(3, -0.5);
-
-    // 长椅
-    const benchGeo = new THREE.BoxGeometry(0.8, 0.15, 0.3);
-    const benchMat = new THREE.MeshLambertMaterial({ color: 0x886644 });
-    const bench = new THREE.Mesh(benchGeo, benchMat);
-    bench.position.set(-2, 0.15, -1.7);
-    scene.add(bench);
-}
-
-function createLampPost(x, z) {
-    // 灯柱
-    const poleGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.8, 8);
-    const poleMat = new THREE.MeshLambertMaterial({ color: 0x888888 });
-    const pole = new THREE.Mesh(poleGeo, poleMat);
-    pole.position.set(x, 0.4, z);
-    scene.add(pole);
-
-    // 灯罩
-    const lampGeo = new THREE.SphereGeometry(0.1, 8, 8);
-    const lampMat = new THREE.MeshBasicMaterial({ color: 0xffffaa });
-    const lamp = new THREE.Mesh(lampGeo, lampMat);
-    lamp.position.set(x, 0.85, z);
-    scene.add(lamp);
-}
-
-function onCityMouseMove(event) {
-    const canvas = event.target;
-    const rect = canvas.getBoundingClientRect();
-    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects(
-        Object.values(districtMeshes).filter(m => m)
-    );
-
-    if (intersects.length > 0) {
-        const region = intersects[0].object.userData.region;
-        if (region !== currentHoveredDistrict) {
-            currentHoveredDistrict = region;
-            showMapHoverCard(region);
-        }
-    } else {
-        if (currentHoveredDistrict) {
-            currentHoveredDistrict = null;
-            hideMapHoverCard();
-        }
-    }
-}
-
-function onCityClick(event) {
-    // 如果点击的是宠物或宠物容器，不处理
-    const petContainer = document.getElementById('pet-container');
-    const floatingPet = document.getElementById('floating-pet');
-    if (petContainer && floatingPet) {
-        const petRect = floatingPet.getBoundingClientRect();
-        // 检查点击位置是否在宠物边界内（考虑一定容忍度）
-        const tolerance = 20;
-        if (event.clientX >= petRect.left - tolerance && 
-            event.clientX <= petRect.right + tolerance &&
-            event.clientY >= petRect.top - tolerance && 
-            event.clientY <= petRect.bottom + tolerance) {
-            return;
-        }
-    }
-    
-    const canvas = event.target;
-    const rect = canvas.getBoundingClientRect();
-    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects(
-        Object.values(districtMeshes).filter(m => m)
-    );
-
-    if (intersects.length > 0 && !State.isDragging && !Timers.isMoving) {
-        const region = intersects[0].object.userData.region;
-        movePetToRegionCenter(region);
-        showBubble(`去${MapRegions[region]?.shortName || '区域'}巡游一下～`);
-    }
-}
-
-function onCityResize() {
-    if (!cityContainer || !renderer || !camera) return;
-    const aspect = cityContainer.clientWidth / cityContainer.clientHeight;
-    const frustumSize = 24;
-    camera.left = frustumSize * aspect / -2;
-    camera.right = frustumSize * aspect / 2;
-    camera.top = frustumSize / 2;
-    camera.bottom = frustumSize / -2;
-    camera.updateProjectionMatrix();
-    renderer.setSize(cityContainer.clientWidth, cityContainer.clientHeight);
-}
-
-function animateCity() {
-    requestAnimationFrame(animateCity);
-
-    // 不再自动旋转相机，保持固定视角
-    if (renderer && scene && camera) {
-        renderer.render(scene, camera);
-    }
-}
 
 // ========== 页面可见性控制 ==========
 document.addEventListener('visibilitychange', () => {
@@ -884,16 +482,13 @@ document.addEventListener('visibilitychange', () => {
 
 function pauseAllAnimations() {
     if (Timers.particleRAF) { cancelAnimationFrame(Timers.particleRAF); Timers.particleRAF = null; }
-    if (Timers.moveTimeout) { clearTimeout(Timers.moveTimeout); Timers.moveTimeout = null; }
     if (Timers.blinkTimeout) { clearTimeout(Timers.blinkTimeout); Timers.blinkTimeout = null; }
     if (Timers.bubbleTimeout) { clearTimeout(Timers.bubbleTimeout); Timers.bubbleTimeout = null; }
-    stopRegionDetection();
 }
 
 function resumeAllAnimations() {
     if (State.isSetupComplete) {
         startParticleAnimation();
-        startPetAI();
         startBlinking();
     }
 }
@@ -909,10 +504,8 @@ function loadState() {
             if (State.stats.lucky === undefined) {
                 State.stats.lucky = 65;
             }
-            // 兼容旧版本的 isFirstVisit 字段
-            if (State.isFirstVisit !== undefined && State.isSetupComplete === undefined) {
-                State.isSetupComplete = !State.isFirstVisit;
-            }
+            // 重要：无论旧数据是什么，都要显示欢迎页面让用户重新选择宠物
+            // 删除旧版本的 isFirstVisit 兼容逻辑，让用户重新设置
         } catch (e) {
             console.warn('Failed to load state');
             // 解析失败，视为首次设置
@@ -1173,7 +766,6 @@ function initMainInteractions() {
     });
 
     initRecordsUI();
-    initMapInteractions();
     updateAdvice();
 }
 
@@ -1605,20 +1197,19 @@ function initFloatingPet() {
     updatePetExpression();
     updateHeadIcon();
 
-    const initialRegion = detectCurrentRegion();
-    if (initialRegion) {
-        onRegionEnter(initialRegion);
+    // 启动随机移动
+    if (State.wanderMode) {
+        setTimeout(movePetRandomly, 3000 + Math.random() * 3000);
     }
 }
 
-function getSceneBounds() {
+// ========== 宠物位置约束 ==========
+function clampPetPosition(x, y) {
     const rightPanel = document.querySelector('.right-panel');
     if (!rightPanel) {
         return {
-            minX: 40,
-            maxX: window.innerWidth - PET_WIDTH - 40,
-            minY: 70,
-            maxY: window.innerHeight - PET_HEIGHT - 40
+            x: Math.max(40, Math.min(window.innerWidth - PET_WIDTH - 40, x)),
+            y: Math.max(70, Math.min(window.innerHeight - PET_HEIGHT - 40, y))
         };
     }
 
@@ -1628,18 +1219,8 @@ function getSceneBounds() {
     const bottomPadding = window.innerWidth <= 768 ? 24 : 28;
 
     return {
-        minX: rect.left + horizontalPadding,
-        maxX: rect.right - PET_WIDTH - horizontalPadding,
-        minY: rect.top + topPadding,
-        maxY: rect.bottom - PET_HEIGHT - bottomPadding
-    };
-}
-
-function clampPetPosition(x, y) {
-    const bounds = getSceneBounds();
-    return {
-        x: Math.max(bounds.minX, Math.min(bounds.maxX, x)),
-        y: Math.max(bounds.minY, Math.min(bounds.maxY, y))
+        x: Math.max(rect.left + horizontalPadding, Math.min(rect.right - PET_WIDTH - horizontalPadding, x)),
+        y: Math.max(rect.top + topPadding, Math.min(rect.bottom - PET_HEIGHT - bottomPadding, y))
     };
 }
 
@@ -1761,8 +1342,10 @@ function bindPetInteraction() {
                 if (!State.isDragging) State.wanderMode = true;
             }, 30000);
             
-            const region = detectCurrentRegion();
-            if (region) onRegionEnter(region);
+            // 拖拽结束后恢复随机移动
+            if (State.wanderMode && Math.random() < 0.5) {
+                setTimeout(movePetRandomly, 2000);
+            }
         }
     };
 
@@ -1836,15 +1419,10 @@ function handlePetClick(e) {
         setTimeout(() => floatingPet.classList.remove('spin'), 1000);
     } else {
         floatingPet.classList.add('jump', 'happy');
-        const messagePool = currentRegion === 'warm'
-            ? ['灯光真漂亮！', '这边好暖和～', '想再逛一圈！']
-            : currentRegion === 'active'
-                ? ['轻轨要开啦！', '跟我一起冲呀～', '这里节奏好快！']
-                : currentRegion === 'calm'
-                    ? ['江风好舒服～', '一起慢慢走吧', '这里能安心呼吸']
-                    : currentRegion === 'park'
-                        ? ['草坡软软的～', '想在这里打个滚', '这里最适合休息']
-                        : ['抱抱！', '喜欢你！', '再摸摸我～'];
+        const messagePool = [
+            '抱抱！', '喜欢你！', '再摸摸我～',
+            '好开心呀！', '我们一起玩！', '你真好～'
+        ];
         showBubble(messagePool[Math.floor(Math.random() * messagePool.length)]);
         spawnParticles('hearts', 6);
         setTimeout(() => floatingPet.classList.remove('jump', 'happy'), 520);
@@ -1856,17 +1434,15 @@ function handlePetClick(e) {
 
 function showHoverBubble() {
     const mood = State.stats.mood;
-    const region = currentRegion ? MapRegions[currentRegion] : null;
-    const regionPrefix = region ? `${region.shortName}这边` : '今天';
     const text = mood >= 80
-        ? `${regionPrefix}也被你点亮啦 ✨`
+        ? '今天也被你点亮啦 ✨'
         : mood >= 60
-            ? `${regionPrefix}陪着你真好～`
+            ? '陪着你真好～'
             : mood >= 40
                 ? '摸摸我，我们继续散步～'
                 : mood >= 20
                     ? '先陪我安静一会儿...'
-                    : '抱抱我，我们去找亮灯的地方';
+                    : '抱抱我，陪你一起';
     const bubbleText = document.getElementById('bubble-text');
     if (bubbleText) bubbleText.textContent = text;
     const bubble = document.getElementById('pet-bubble');
@@ -1925,65 +1501,9 @@ function updatePetPosition() {
         floatingPet.style.left = `${petX}px`;
         floatingPet.style.top = `${petY}px`;
 
-        const bounds = getSceneBounds();
-        const spanY = Math.max(bounds.maxY - bounds.minY, 1);
-        const depth = Math.max(0, Math.min(1, (petY - bounds.minY) / spanY));
-        const petScale = 0.78 + depth * 0.28;
-        const shadowScale = 0.82 + depth * 0.22;
-        const shadowOpacity = 0.22 + depth * 0.13;
 
-        floatingPet.style.setProperty('--pet-scale', petScale.toFixed(3));
-        floatingPet.style.setProperty('--pet-shadow-scale', shadowScale.toFixed(3));
-        floatingPet.style.setProperty('--pet-shadow-opacity', shadowOpacity.toFixed(3));
-        floatingPet.style.zIndex = String(950 + Math.round(depth * 40));
+        floatingPet.style.zIndex = '1000';
     }
-}
-
-function getChongqingProjectedRoute(regionId) {
-    if (typeof window.getChongqingRoutePoints !== 'function' || typeof window.projectChongqingWorldPoint !== 'function') {
-        return [];
-    }
-
-    return window.getChongqingRoutePoints(regionId)
-        .map((point) => window.projectChongqingWorldPoint(point))
-        .filter(Boolean);
-}
-
-function movePetAlongRoute(screenPoints, regionId = null) {
-    if (!screenPoints || screenPoints.length === 0) {
-        return false;
-    }
-
-    const route = [{ x: petX, y: petY }, ...screenPoints];
-    const deduped = [];
-    route.forEach((point) => {
-        const prev = deduped[deduped.length - 1];
-        if (!prev || Math.hypot(point.x - prev.x, point.y - prev.y) > 6) {
-            deduped.push(point);
-        }
-    });
-
-    if (deduped.length < 2) {
-        return false;
-    }
-
-    const stepToPoint = (index) => {
-        const target = deduped[index];
-        const isFinal = index >= deduped.length - 1;
-
-        movePetTo(target.x, target.y, {
-            regionId: isFinal ? regionId : null,
-            finalizeRegionEnter: isFinal,
-            onComplete: () => {
-                if (!isFinal) {
-                    stepToPoint(index + 1);
-                }
-            }
-        });
-    };
-
-    stepToPoint(1);
-    return true;
 }
 
 // ========== 眨眼系统 ==========
@@ -1996,201 +1516,6 @@ function startBlinking() {
         }, 150);
     }
     Timers.blinkTimeout = setTimeout(startBlinking, 2800 + Math.random() * 3200);
-}
-
-// ========== 宠物与环境交互 ==========
-const MapRegions = {
-    warm: {
-        id: 'warm',
-        name: '暖光区',
-        shortName: '洪崖洞',
-        bubble: '灯火一层层亮起来啦～',
-        particles: 'hearts',
-        expression: 'happy'
-    },
-    active: {
-        id: 'active',
-        name: '活力区',
-        shortName: '来福士',
-        bubble: '轻轨从头顶掠过去啦！',
-        particles: 'stars',
-        expression: 'surprised'
-    },
-    calm: {
-        id: 'calm',
-        name: '宁静区',
-        shortName: '江岸',
-        bubble: '江风慢慢吹，先放松一下~',
-        particles: 'happy',
-        expression: 'calm'
-    },
-    park: {
-        id: 'park',
-        name: '放松区',
-        shortName: '公园',
-        bubble: '草坡软软的，适合打个滚~',
-        particles: 'hearts',
-        expression: 'calm'
-    }
-};
-
-let currentRegion = null;
-let regionCheckInterval = null;
-
-function detectCurrentRegion() {
-    // 简化：根据宠物位置判断
-    if (!floatingPet) return null;
-    const petRect = floatingPet.getBoundingClientRect();
-    const px = petRect.left + petRect.width / 2;
-    const pw = window.innerWidth;
-
-    if (px < pw * 0.3) return MapRegions['park'] || null;
-    if (px < pw * 0.5) return MapRegions['warm'] || null;
-    if (px < pw * 0.75) return MapRegions['active'] || null;
-    return MapRegions['calm'] || null;
-}
-
-function initMapInteractions() {
-    initMapHoverCardRefs();
-    initDistrictStatusPanel();
-
-    // 绑定区域状态面板点击
-    document.querySelectorAll('.district-chip').forEach(chip => {
-        chip.addEventListener('click', () => {
-            const regionId = chip.dataset.regionChip;
-            if (regionId && MapRegions[regionId]) {
-                movePetToRegionCenter(regionId);
-                showBubble(`去${MapRegions[regionId].shortName}巡游一下～`);
-            }
-        });
-    });
-
-    const initialRegion = detectCurrentRegion();
-    if (initialRegion) {
-        currentRegion = initialRegion.id;
-    }
-}
-
-function initMapHoverCardRefs() {
-    mapHoverCard = document.getElementById('map-hover-card');
-    mapHoverTitle = document.getElementById('map-hover-title');
-    mapHoverText = document.getElementById('map-hover-text');
-}
-
-const DistrictStatusLibrary = {
-    warm: [
-        { text: '暖光满载', tone: 'good' },
-        { text: '步道偏热闹', tone: 'warn' },
-        { text: '灯火恢复中', tone: 'calm' }
-    ],
-    active: [
-        { text: '轻轨畅通', tone: 'good' },
-        { text: '客流升高', tone: 'warn' },
-        { text: '空桥增益', tone: 'calm' }
-    ],
-    calm: [
-        { text: '雾气舒缓', tone: 'calm' },
-        { text: '江风加成', tone: 'good' },
-        { text: '夜色偏深', tone: 'warn' }
-    ],
-    park: [
-        { text: '绿意恢复', tone: 'good' },
-        { text: '花坡安静', tone: 'calm' },
-        { text: '山路湿滑', tone: 'warn' }
-    ]
-};
-
-function initDistrictStatusPanel() {
-    const statusIndexMap = {};
-    Object.keys(DistrictStatusLibrary).forEach(regionId => {
-        statusIndexMap[regionId] = 0;
-        renderDistrictStatus(regionId, 0);
-    });
-
-    setInterval(() => {
-        Object.keys(DistrictStatusLibrary).forEach(regionId => {
-            statusIndexMap[regionId] = (statusIndexMap[regionId] + 1) % DistrictStatusLibrary[regionId].length;
-            renderDistrictStatus(regionId, statusIndexMap[regionId]);
-        });
-    }, 2500);
-}
-
-function renderDistrictStatus(regionId, statusIndex) {
-    const statusList = DistrictStatusLibrary[regionId];
-    const chip = document.querySelector(`[data-region-chip="${regionId}"]`);
-    if (!statusList || !chip) return;
-
-    const status = statusList[statusIndex % statusList.length];
-    const statusEl = chip.querySelector('.chip-status');
-    chip.dataset.tone = status.tone;
-    if (statusEl) statusEl.textContent = status.text;
-}
-
-function showMapHoverCard(regionId) {
-    const region = MapRegions[regionId];
-    if (!region || !mapHoverCard || !mapHoverTitle || !mapHoverText) return;
-
-    const titleMap = {
-        warm: '洪崖洞暖光街区',
-        active: '来福士轻轨中枢',
-        calm: '江岸慢行步道',
-        park: '山坡放松公园'
-    };
-    const descMap = {
-        warm: '层层退台的暖色吊脚楼，灯火通明的山城夜景。',
-        active: '现代玻璃塔楼与轻轨平台，立体交通的活力核心。',
-        calm: '江滩栈道与缓慢流水，安静的可漫游地带。',
-        park: '多层绿坡与树荫，适合休息放松的公园空间。'
-    };
-
-    mapHoverTitle.textContent = titleMap[regionId] || region.title;
-    mapHoverText.textContent = descMap[regionId] || region.description;
-    mapHoverCard.classList.add('show');
-    mapHoverCard.setAttribute('aria-hidden', 'false');
-}
-
-function hideMapHoverCard() {
-    if (!mapHoverCard) return;
-    mapHoverCard.classList.remove('show');
-    mapHoverCard.setAttribute('aria-hidden', 'true');
-}
-
-function onRegionEnter(region) {
-    if (!region) return;
-    currentRegion = region.id;
-    showBubble(region.bubble);
-    spawnParticles(region.particles, region.id === 'active' ? 5 : 4);
-}
-
-function startRegionDetection() {
-    if (regionCheckInterval) return;
-    regionCheckInterval = setInterval(() => {
-        if (document.hidden || State.isDragging || Timers.isMoving) return;
-        const newRegion = detectCurrentRegion();
-        if (newRegion && newRegion.id !== currentRegion) {
-            onRegionEnter(newRegion);
-        }
-    }, 1600);
-}
-
-function stopRegionDetection() {
-    if (regionCheckInterval) {
-        clearInterval(regionCheckInterval);
-        regionCheckInterval = null;
-    }
-}
-
-function startPetAI() {
-    if (document.hidden || !State.isSetupComplete) return;
-    if (Timers.moveTimeout) clearTimeout(Timers.moveTimeout);
-
-    Timers.moveTimeout = setTimeout(() => {
-        if (State.wanderMode && !State.isDragging && !Timers.isMoving && Math.random() < 0.7) {
-            movePet();
-        } else {
-            startPetAI();
-        }
-    }, 6200 + Math.random() * 6000);
 }
 
 // ========== 移动时情绪小语言 ==========
@@ -2318,25 +1643,32 @@ function getMoodWalkPhrase() {
     return MoodWalkPhrases.normal[Math.floor(Math.random() * MoodWalkPhrases.normal.length)];
 }
 
-function movePet() {
-    if (!floatingPet) return;
+// ========== 宠物移动（简化版 - 随机移动）==========
+function movePetRandomly() {
+    if (!floatingPet || State.isDragging) return;
 
-    // 移动前显示情绪小语言（随机30%概率显示）
+    // 随机30%概率显示情绪小语言
     if (Math.random() < 0.3) {
         showBubble(getMoodWalkPhrase(), 2500);
     }
 
-    const regionIds = Object.keys(MapRegions).filter((regionId) => MapRegions[regionId] && regionId !== currentRegion);
-    const nextRegion = regionIds[Math.floor(Math.random() * regionIds.length)] || currentRegion || 'calm';
-    movePetToRegionCenter(nextRegion);
+    // 随机目标位置（在容器范围内）
+    const petContainer = document.getElementById('pet-container');
+    if (!petContainer) return;
+
+    const rect = petContainer.getBoundingClientRect();
+    const targetX = Math.random() * (rect.width - PET_WIDTH * 2) + PET_WIDTH;
+    const targetY = Math.random() * (rect.height - PET_HEIGHT * 2) + PET_HEIGHT;
+
+    movePetTo(targetX, targetY);
 }
 
-function movePetTo(targetX, targetY, { regionId = null, finalizeRegionEnter = true, onComplete = null } = {}) {
+function movePetTo(targetX, targetY) {
     if (!floatingPet) return;
 
     const clamped = clampPetPosition(targetX, targetY);
     const distance = Math.hypot(clamped.x - petX, clamped.y - petY);
-    const duration = Math.min(2600, Math.max(1200, Math.round(distance * 4.2)));
+    const duration = Math.min(2000, Math.max(800, Math.round(distance * 3)));
 
     if (Timers.moveTimeout) clearTimeout(Timers.moveTimeout);
 
@@ -2352,42 +1684,14 @@ function movePetTo(targetX, targetY, { regionId = null, finalizeRegionEnter = tr
     Timers.moveTimeout = setTimeout(() => {
         State.position = { x: petX, y: petY };
         saveState();
+        Timers.isMoving = false;
+        floatingPet.classList.remove('moving');
 
-        if (finalizeRegionEnter) {
-            Timers.isMoving = false;
-            floatingPet.classList.remove('moving');
-
-            const nextRegion = regionId ? MapRegions[regionId] : detectCurrentRegion();
-            if (nextRegion) onRegionEnter(nextRegion);
-            else {
-                currentRegion = null;
-            }
-
-            startPetAI();
-        }
-
-        if (typeof onComplete === 'function') {
-            onComplete();
+        // 继续随机移动
+        if (State.wanderMode && Math.random() < 0.7) {
+            setTimeout(movePetRandomly, 4000 + Math.random() * 4000);
         }
     }, duration + 40);
-}
-
-function movePetToRegionCenter(regionId) {
-    const projectedRoute = getChongqingProjectedRoute(regionId);
-    if (movePetAlongRoute(projectedRoute, regionId)) {
-        return;
-    }
-
-    const bounds = getSceneBounds();
-    const regionPositions = {
-        warm: { x: bounds.minX + (bounds.maxX - bounds.minX) * 0.25, y: bounds.minY + (bounds.maxY - bounds.minY) * 0.4 },
-        active: { x: bounds.minX + (bounds.maxX - bounds.minX) * 0.75, y: bounds.minY + (bounds.maxY - bounds.minY) * 0.4 },
-        calm: { x: bounds.minX + (bounds.maxX - bounds.minX) * 0.5, y: bounds.minY + (bounds.maxY - bounds.minY) * 0.7 },
-        park: { x: bounds.minX + (bounds.maxX - bounds.minX) * 0.15, y: bounds.minY + (bounds.maxY - bounds.minY) * 0.55 }
-    };
-
-    const target = regionPositions[regionId] || { x: petX, y: petY };
-    movePetTo(target.x, target.y, { regionId });
 }
 
 // ========== 粒子系统 ==========

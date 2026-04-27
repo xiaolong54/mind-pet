@@ -6,7 +6,7 @@
     <title>心灵伙伴 - MindPet</title>
     <link rel="stylesheet" href="css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <!-- Three.js CDN - 使用与 CubeCity 兼容的版本 -->
+    <!-- Three.js CDN - 保留用于可能的3D扩展 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -174,39 +174,9 @@
         
         <!-- ========== 右侧地图区域 ========== -->
         <main class="right-panel">
-            <!-- Three.js 渲染的重庆2.5D城市 -->
-            <div class="city-container" id="city-container">
-                <canvas id="city-canvas"></canvas>
-                <!-- 区域信息悬浮卡 -->
-                <div class="map-hover-card" id="map-hover-card" aria-hidden="true">
-                    <strong id="map-hover-title">洪崖洞暖光街区</strong>
-                    <span id="map-hover-text">参考 CubeCity 的可放置体块语法，把吊脚楼拆成层层退台的暖色立方体街区。</span>
-                </div>
-                <!-- 区域状态面板 -->
-                <div class="district-status-panel" id="district-status-panel" aria-label="区域运行状态">
-                    <div class="district-chip chip-warm" data-region-chip="warm">
-                        <span class="chip-name">洪崖洞</span>
-                        <strong class="chip-status">暖光满载</strong>
-                    </div>
-                    <div class="district-chip chip-active" data-region-chip="active">
-                        <span class="chip-name">来福士</span>
-                        <strong class="chip-status">轻轨畅通</strong>
-                    </div>
-                    <div class="district-chip chip-calm" data-region-chip="calm">
-                        <span class="chip-name">江岸步道</span>
-                        <strong class="chip-status">雾气舒缓</strong>
-                    </div>
-                    <div class="district-chip chip-park" data-region-chip="park">
-                        <span class="chip-name">山坡公园</span>
-                        <strong class="chip-status">绿意恢复</strong>
-                    </div>
-                </div>
-                <!-- 地图标题 -->
-                <div class="map-title">
-                    <span class="map-icon">🏙️</span>
-                    <span>重庆 · 山城漫步</span>
-                    <small class="map-subtitle">2.5D 情绪棋盘</small>
-                </div>
+            <!-- 图片地图容器 -->
+            <div class="map-container" id="map-container">
+                <img id="map-image" src="Gemini_Generated_Image_mj549hmj549hmj54.png" alt="重庆山城地图" draggable="false">
             </div>
             
             <!-- 宠物容器 -->
@@ -307,7 +277,5 @@
 
     <!-- 主逻辑 -->
     <script src="js/main.js"></script>
-    <!-- 重庆城市地图 - 基于 CubeCity 改进 -->
-    <script src="js/chongqing-city.js"></script>
 </body>
 </html>
